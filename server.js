@@ -3,7 +3,12 @@ const path = require("path");
 const dotenv = require("dotenv").config();
 const http = require("http");
 const socketio = require("socket.io");
-const { userJoin, getCurrentUser } = require("./utils/user");
+const {
+  userJoin,
+  getCurrentUser,
+  userLeaves,
+  getUserRoom,
+} = require("./utils/user");
 
 const app = express();
 const server = http.createServer(app);
@@ -31,6 +36,11 @@ io.on("connection", (socket) => {
         "message",
         formatMessages(botName, `${user.username} has joined the chat`)
       );
+    // send user and room details
+    io.to(user.room).emit("roomUsers", {
+      room: user.room,
+      users: getUserRoom(user.room),
+    });
   });
 
   // listen message
@@ -41,8 +51,18 @@ io.on("connection", (socket) => {
 
   // disconnect the current user
   socket.on("disconnect", () => {
+    const user = userLeaves(socket.id);
     // broadcast to all user including current one
-    io.emit("message", formatMessages(botName, `a user has left the chat`));
+    if (user) {
+      io.to(user.room).emit(
+        "message",
+        formatMessages(botName, `${user.username} has left the chat`)
+      );
+      io.to(user.room).emit("roomUsers", {
+        room: user.room,
+        users: getUserRoom(user.room),
+      });
+    }
   });
 });
 
